@@ -3,9 +3,7 @@ package com.example.webbackend.controller;
 import com.example.webbackend.entity.Book;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -111,8 +109,144 @@ public class BookController {
         return books.stream().sorted(comparator)
                 .collect(Collectors.toList());
 
+    }
 
+    // PUT - Update entire book
+    @PutMapping("/books/{id}")
+    public Book updateBook(@PathVariable Long id,
+                           @RequestBody Book updatedBook) {
+        for (Book book : books) {
+            if (book.getId().equals(id)) {
+                book.setTitle(updatedBook.getTitle());
+                book.setAuthor(updatedBook.getAuthor());
+                book.setPrice(updatedBook.getPrice());
 
+                return book;
+            }
+        }
+
+        return null;
+    }
+
+    // PATCH - partial update
+    @PatchMapping("/books/{id}")
+    public Book patchBook(@PathVariable Long id,
+                          @RequestBody Map<String, Object> updates) {
+        for (Book book : books) {
+            if (book.getId().equals(id)) {
+
+                if (updates.containsKey("title")) {
+                    book.setTitle((String) updates.get("title"));
+                }
+
+                if (updates.containsKey("author")) {
+                    book.setAuthor((String) updates.get("author"));
+                }
+
+                if (updates.containsKey("price")) {
+                    book.setPrice(Double.valueOf(updates.get("price").toString()));
+                }
+
+                return book;
+            }
+        }
+
+        return null;
+    }
+
+    // DELETE - remove book
+    @DeleteMapping("/books/{id}")
+    public String deleteBook(@PathVariable Long id) {
+
+        Iterator<Book> iterator = books.iterator();
+
+        while (iterator.hasNext()) {
+            Book book = iterator.next();
+            if (book.getId().equals(id)) {
+                iterator.remove();
+                return "Book deleted successfully.";
+            }
+        }
+
+        return "Book not found.";
+    }
+
+    // pagination
+    @GetMapping("/books/paginated")
+    public List<Book> getPaginatedBooks(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
+    ) {
+        int start = page * size;
+        int end = Math.min(start + size, books.size());
+
+        if(start > books.size()) {
+            return new ArrayList<>();
+        }
+
+        return books.subList(start, end);
+    }
+
+    // advanced - filter, sort, then paginate
+    @GetMapping("/books/advanced")
+    public List<Book> getAdvancedBooks(
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(defaultValue = "title") String sortBy,
+            @RequestParam(defaultValue = "asc") String order,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size
+    ) {
+        // filter
+        List<Book> filtered = books.stream()
+                .filter(book -> {
+                    boolean matchesTitle =
+                            title == null || book.getTitle().toLowerCase().contains(title.toLowerCase());
+
+                    boolean matchesMin =
+                            minPrice == null || book.getPrice() >= minPrice;
+
+                    boolean matchesMax =
+                            maxPrice == null || book.getPrice() <= maxPrice;
+
+                    return matchesTitle && matchesMin && matchesMax;
+                })
+                .collect(Collectors.toList());
+
+        // sort
+        Comparator<Book> comparator;
+
+        switch (sortBy.toLowerCase()) {
+            case "author":
+                comparator = Comparator.comparing(Book::getAuthor);
+                break;
+            case "price":
+                comparator = Comparator.comparing(Book::getPrice);
+                break;
+            case "title":
+            default:
+                comparator = Comparator.comparing(Book::getTitle);
+                break;
+        }
+
+        if ("desc".equalsIgnoreCase(order)) {
+            comparator = comparator.reversed();
+        }
+
+        List<Book> sorted = filtered.stream()
+                .sorted(comparator)
+                .collect(Collectors.toList());
+
+        // paginate
+        int start = page * size;
+        int end = Math.min(start + size, sorted.size());
+
+        if(start > sorted.size()) {
+            return new ArrayList<>();
+        }
+
+        return sorted.subList(start, end);
     }
 
 
